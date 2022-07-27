@@ -67,7 +67,7 @@
             search: null,
             weatherForecasts: [],
             show: false,
-            alert: true,
+            alert: false,
             weatherForecastId: '',
             timerId: ''
         };
@@ -125,6 +125,7 @@
         this.$axios.post('weather-forecast/store', {content: this.weatherForecasts})
           .then(({data}) => {
             this.weatherForecastId = data
+            this.alert = true
           })
           .catch(function (error) {
             console.log(error);
