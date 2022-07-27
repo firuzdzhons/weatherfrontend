@@ -9,117 +9,129 @@
               :items="items"
               :loading="isLoading"
               :search-input.sync="search"
-              hide-no-data
               hide-selected
               item-text="fullname"
               item-value="fullname"
-              label="Public APIs"
-              placeholder="Start typing to Search"
-              prepend-icon="mdi-database-search"
+              label="Search"
+              placeholder="Start typing to search"
               return-object
-              @change="getWeather"
+              outlined
+              @change="searchWeatherForecast"
             ></v-autocomplete>
           </v-col>
           <v-col cols="2">
             <v-btn
+              x-large
+              @click="storeWeatherForecast"
               color="primary"
+              :loading="isLoading"
+              :disabled="isLoading || weatherForecasts.length == 0"
             >
               Save
             </v-btn>
           </v-col>
         </v-row>
+        <v-row>
+          <v-col cols="10">
+            <v-alert
+                v-model="alert"
+                dismissible
+                color="primary"
+                border="left"
+                elevation="2"
+                colored-border
+                v-if="weatherForecastId"
+              >
+                <NuxtLink target="_blank" :to="'weather_forecast/'+weatherForecastId">Link to list</NuxtLink>
+            </v-alert>
+          </v-col>
+        </v-row>
+        <v-row>
+          
+          <v-col cols="10" v-for="weatherForecast in weatherForecasts" :key="weatherForecast.dt">
+            <WeatherForecastCard :weatherForecast="weatherForecast"/>
+          </v-col>
+        </v-row>
       </v-container>
-       <v-container>
-          <v-row>
-            <v-col cols="10" v-for="w in weather">
-              <v-card class="mt-2">
-                  <v-card-text>
-                    <div class="d-flex justify-space-between" >
-                      <h2>{{w.name}}</h2>
-                      <h3>{{w.weather[0].main}}</h3>  
-                      <h2>{{w.main.temp}} C</h2>
-                    </div>
-                  </v-card-text>
-              </v-card>
-            </v-col>
-          </v-row>
-        </v-container>
-      
     </v-col>
   </v-row>
 </template>
-
 <script>
-export default {
-  name: 'IndexPage',
-  data() {
-    return {
-      nameLimit: 60,
-      entries: [],
-      isLoading: false,
-      model: null,
-      search: null,
-      weather: []
-    }
-  },
-  computed: {
-    items () {
-        return this.entries.map(entry => {
-          // const name = entry.name.length > this.nameLimit
-          //   ? entry.name.slice(0, this.nameLimit) + '...'
-          //   : entry.name
-          const fullname = entry.name+', '+entry.country
-
-          return Object.assign({}, entry, { fullname })
-        })
-      }
-  },
-  watch: {
-    search (val) {
-      // console.log(val)
-      // // Items have already been loaded
-      // if (this.items.length > 0) return
-
-      // this.items = []
-      // Items have already been requested
-      if (this.isLoading) return
-
-      this.isLoading = true
-
-      // Lazily load input items
-      fetch(`http://weatherapi/api/find-city?name=${val}`)
-        .then(res => res.json())
-        .then(res => {
-          // const { count, entries } = res
-          // console.log(entries)
-          // console.log(res)
-          this.count = res.length
-          this.entries = res
-        })
-        .catch(err => {
-          console.log(err)
-        })
-        .finally(() => (this.isLoading = false))
+  export default {
+    name: "IndexPage",
+    data() {
+        return {
+            entries: [],
+            isLoading: false,
+            model: null,
+            search: null,
+            weatherForecasts: [],
+            show: false,
+            alert: true,
+            weatherForecastId: '',
+            timerId: ''
+        };
     },
-  },
-  methods: {
-    getWeather()
-    {
-       fetch(`http://weatherapi/api/get-weather-data?q=${this.model.fullname}`)
-        .then(res => res.json())
-        .then(res => {
-          // const { count, entries } = res
-          // console.log(entries)
-          // console.log(res)
-          // this.count = res.length
-          // this.entries = res
-          this.weather.push(res)
-        })
-        .catch(err => {
-          console.log(err)
-        })
-        .finally(() => (this.isLoading = false))
+    computed: {
+        items() {
+          return this.entries.map(entry => {
+              const fullname = entry.name + ", " + entry.country;
+              return Object.assign({}, entry, { fullname });
+          });
+        },
+    },
+    watch: {
+        search(val) {
+          if (!val) return;
+
+          this.searchCity(val)
+        },
+    },
+    methods: {
+      searchCity(city) {
+        clearTimeout(this.timerId)
+
+        this.isLoading = true;
+
+        this._timerId = setTimeout(() => {
+          this.$axios.$get(`city/search?name=${city}`)
+          .then((res) => {
+            this.entries = res
+          })
+          .catch(function (error) {
+              console.log(error);
+          }).finally(() => {
+              this.isLoading = false;
+          });
+        }, 500)
+        
+      },
+      searchWeatherForecast() {
+        if(!this.model) return
+
+        this.isLoading = true;
+       
+        this.$axios.$get(`weather-forecast/search?q=${this.model.fullname}`)
+          .then((res) => {
+            this.weatherForecasts.push(res);
+          })
+          .catch(err => {
+            console.log(err);
+          })
+          .finally(() => (this.isLoading = false));
+      },
+      storeWeatherForecast() {
+        this.isLoading = true;
+        this.$axios.post('weather-forecast/store', {content: this.weatherForecasts})
+          .then(({data}) => {
+            this.weatherForecastId = data
+          })
+          .catch(function (error) {
+            console.log(error);
+          }).finally(() => {
+            this.isLoading = false;
+          });
+      }
     }
-  },
 }
 </script>
